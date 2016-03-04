@@ -59,7 +59,7 @@ def maas_setup(vlans, bundle_charm):
             num_units = service['num_units']
             service_spaces = []
 
-            for endpoint, space in service['bindings'].items():
+            for relation, space in service['bindings'].items():
                 if space not in service_spaces:
                     service_spaces.append(space)
                     all_spaces.add(space)
@@ -217,42 +217,39 @@ def maas_setup(vlans, bundle_charm):
     return bootstrap_node_name
 
 
-def deploy(bootstrap_node_name, bundle_charm):
+def deploy(controller_name, cloud, bootstrap_node_name, bundle_charm):
     if not bootstrapped():
-        juju('bootstrap --upload-tools --to "{}"'.format(
-              bootstrap_node_name))
+        juju('bootstrap {} {} --upload-tools --to "{}"'.format(
+            controller_name, cloud, bootstrap_node_name))
     wait()
     juju('deploy ' + bundle_charm)
     wait()
 
 
 def service_address(unit, relation):
-    out = juju('run --unit {unit} "relation-ids {relation}"'.format(
-                 unit=unit, relation=relation),
-               silent=True).splitlines()
-    rid = None
-    for line in out:
-        if line.startswith(relation):
-            rid = line
-    if rid is None:
-        exit('Failed to find relation ID for {} {}'.format(unit, relation))
-    address = juju(
-        'run --unit {unit} "network-get -r {rid} --primary-address"'.format(
-            unit=unit, rid=rid),
+    network_get_output = juju(
+        'run --unit {unit} "network-get {relation} --primary-address"'.format(
+            unit=unit, relation=relation),
         silent=True).rstrip()
-    return address
+    for line in network_get_output.split('\n'):
+        try:
+            return ipaddress.IPv4Address(line)
+        except:
+            continue
+    return None
 
 
-def check(vlans):
-    services = status()['services']
-    for service in services.values():
-        for unit in service['units']:
-            for relation in service['relations'].keys():
+def check(vlans, bundle_charm):
+    with open(bundle_charm) as f:
+        bundle = yaml.load(f)
+
+        for name, service in bundle['services'].items():
+            for relation, space in service['bindings'].items():
+                unit = name + '/0'
                 address = service_address(unit, relation)
-
                 found = False
                 for vlan in vlans:
-                    if ipaddress.IPv4Address(address) in vlan.network.hosts():
+                    if address in vlan.network.hosts():
                         print(unit, relation, address, 'in', vlan.name)
                         found = True
                         continue
@@ -261,7 +258,7 @@ def check(vlans):
                     print(unit, relation, address, 'not in a VLAN')
 
 
-if __name__ == '__main__':
+def main():
     vlans = [
         VLAN('internal', '192.168.10.0/24', 10, 'enp2s0.10'),
         VLAN('public', '192.168.11.0/24', 11, 'enp2s0.11'),
@@ -271,6 +268,9 @@ if __name__ == '__main__':
     bundle_charm = 'charms/mediawiki/bundle.yaml'
 
     bootstrap_node = maas_setup(vlans, bundle_charm)
-    deploy(bootstrap_node, bundle_charm)
+    deploy('maas', 'maas', bootstrap_node, bundle_charm)
     wait()
-    check(vlans)
+    check(vlans, bundle_charm)
+
+if __name__ == '__main__':
+    main()

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from threading import Timer
 
 
-def run(cmd, quiet=False, write_to=None, fail_ok=False, empty_return=False, timestamp=False, timeout=None):
+def run(cmd, quiet=False, write_to=None, fail_ok=False, empty_return=False, timestamp=False, timeout=None, fail_exits=False):
     if not quiet:
         print(cmd)
 
@@ -45,9 +45,14 @@ def run(cmd, quiet=False, write_to=None, fail_ok=False, empty_return=False, time
         return out, p.returncode
 
     if p.returncode:
-        print('-' * 80)
-        print(cmd, 'returned', p.returncode)
-        print(out)
+        if quiet:
+            print('-' * 80)
+            print(cmd, 'returned', p.returncode)
+            print(out)
+        else:
+            print(cmd, 'returned', p.returncode)
+        if fail_exits:
+            exit(p.returncode)
         raise subprocess.CalledProcessError(p.returncode, cmd, out)
 
     return out
