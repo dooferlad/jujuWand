@@ -353,11 +353,21 @@ def test(args, db):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('--force', action='store_true')
-    parser.add_argument('--fast', action='store_true')
-    parser.add_argument('--rerun', action='store_true')
-    parser.add_argument('--changed', action='store_true')
-    parser.add_argument('--stop-on-failure', action='store_true')
+    parser.add_argument(
+        '--force', action='store_true',
+        help='Normally will only run if go build results in some output. This forces a complete run.')
+    parser.add_argument(
+        '--fast', action='store_true',
+        help='[experimental] Run slow packages first. Later may try and split up large packages for increased parallelism.')
+    parser.add_argument(
+        '--rerun', action='store_true',
+        help='Re-runs the tests that failed last time.')
+    parser.add_argument(
+        '--changed', action='store_true',
+        help='Run tests in packages with changed files.')
+    parser.add_argument(
+        '--stop-on-failure', action='store_true',
+        help='Abort testing as soon as a failure is detected.')
     args = parser.parse_args()
 
     os.chdir(JUJU_ROOT)
