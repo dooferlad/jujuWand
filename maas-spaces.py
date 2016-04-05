@@ -222,6 +222,7 @@ def deploy(controller_name, cloud, bootstrap_node_name, bundle_charm):
         juju('bootstrap {} {} --upload-tools --to "{}"'.format(
             controller_name, cloud, bootstrap_node_name))
     wait()
+    
     juju('deploy ' + bundle_charm)
     wait()
 
