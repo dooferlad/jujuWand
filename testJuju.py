@@ -61,7 +61,7 @@ def compile_test_runner(package):
     if os.path.exists(runner):
         os.remove(runner)
 
-    run('go test -c -i -o {} {}'.format(runner, package), fail_exits=True, quiet=True)
+    run('nice go test -c -i -o {} {}'.format(runner, package), fail_exits=True, quiet=True)
 
     return runner
 
@@ -72,10 +72,10 @@ def compile_and_run(package):
 
     with open(logName, 'w') as f:
         runner = compile_test_runner(package)
-        out, rc = run(runner + '', write_to=f, fail_ok=True, quiet=True)
+        out, rc = run('nice ' + runner, write_to=f, fail_ok=True, quiet=True)
         if rc:
 
-            print('  FAIL: {}\n{}\n'.format(package, out[:400]))
+            print('  FAIL: {}\n{}\n'.format(package, out[:800]))
     os.remove(runner)
     return rc
 
@@ -156,6 +156,11 @@ def test(args, db):
         'worker/uniter/runner': 18.348,
     }
 
+    output_filename = os.path.join(os.path.expanduser('~'),
+                                   '.jujutestoutput.txt')
+    rerun_filename = os.path.join(os.path.expanduser('~'),
+                                  '.jujutestoutput_rerun.txt')
+
     start_time = datetime.now()
     try:
         install_out = run('go install  -v github.com/juju/juju/...')
@@ -164,12 +169,9 @@ def test(args, db):
             if not line.startswith(JUJU_VCS):
                 print('!', line)
         return e.returncode
-    output_filename = os.path.join(os.path.expanduser('~'),
-                                   '.jujutestoutput.txt')
-    rerun_filename = os.path.join(os.path.expanduser('~'),
-                                  '.jujutestoutput_rerun.txt')
 
     print('Build duration:', datetime.now() - start_time)
+
     start_time = datetime.now()
 
     filename = None
@@ -179,12 +181,6 @@ def test(args, db):
         # Start long tests first
         packages = sorted(packages, key=lambda p: long_tests.get(p, 0), reverse=True)
         rc, failures = test_packages(packages)
-        # failures = ['github.com/juju/juju/state/presence',
-        #             'github.com/juju/juju/utils/ssh',
-        #             'github.com/juju/juju/cmd/jujud/agent',
-        #             'github.com/juju/juju/cmd/pprof',
-        #             'github.com/juju/juju/provider/joyent']
-        # rc = 1
         print('Test duration:', datetime.now() - start_time)
         if rc:
             filename = '/tmp/all_failures.txt'
@@ -221,6 +217,7 @@ def test(args, db):
                 runner = compile_test_runner(package)
                 run(runner, write_to=f, fail_ok=True)
                 os.remove(runner)
+                f.write(">>end of package>>" + package + "\n")
 
         print('Test duration:', datetime.now() - start_time)
         filename = output_filename
@@ -249,6 +246,8 @@ def test(args, db):
             elif os.path.isfile(output_filename):
                 filename = output_filename
 
+        filename = output_filename
+
     unrecoverable = False
     if filename is not None:
         db['failures'] = {}
@@ -258,14 +257,25 @@ def test(args, db):
         re_run = []
         re_run_tests = []
         for line in test_out:
+            s = re.search('>>end of package>>(.*)$', line)
+            if s and len(re_run_tests):
+                db['failures'][s.group(1)] = re_run_tests
+                re_run.append({
+                    'package': s.group(1),
+                    'tests': re_run_tests,
+                })
+                re_run_tests = []
+
             if line.startswith('FAIL:'):
-                s = re.search('^FAIL:\s+.*\.go:\d+:\s+(.*)\s*$', line)
+                s = re.search('^FAIL:\s+.*:\d+:\s+(.*)\s*$', line)
                 if s:
                     print(s.group(1))
                     re_run_tests.append(s.group(1))
                 else:
+                    print("--- Error: don't know how to handle this line:")
                     print(line)
-                    return 0
+                    print("Aborting...")
+                    return 1
             if not re.search('FAIL\s+github.*', line):
                 continue
 
@@ -283,7 +293,7 @@ def test(args, db):
                     'tests': re_run_tests,
                 })
                 re_run_tests = []
-
+    print('-' * 40 + 'failures:' + '-' * 40)
     pprint(db)
 
     if len(db['failures'].keys()) == 0:
