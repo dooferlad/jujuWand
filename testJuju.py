@@ -95,9 +95,8 @@ def test_packages(pkgs):
 
     failures = []
 
-    with concurrent.futures.ProcessPoolExecutor(15) as executor:
+    with concurrent.futures.ProcessPoolExecutor() as executor:
         for package, result in zip(packages, executor.map(compile_and_run, packages)):
-            #print('{}: {}'.format(package, result))
             if result:
                 rc = 1
                 failures.append(package)
