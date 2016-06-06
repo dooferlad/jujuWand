@@ -6,6 +6,25 @@ import os
 import sys
 from urllib.parse import urlparse
 from threading import Timer
+import yaml
+import time
+
+
+class Runner:
+    def __init__(self, settings_file_name):
+        with open(settings_file_name) as f:
+            self.settings = yaml.load(f)
+            self.settings_file_name = settings_file_name
+
+    def sudo(self, cmd, fail_ok=False):
+        return sudo(cmd.format(**self.settings), fail_ok=fail_ok)
+
+    def run(self, cmd, fail_ok=False):
+        return run(cmd.format(**self.settings), fail_ok=fail_ok)
+
+    def save_settings(self):
+        with open(self.settings_file_name, 'w') as f:
+            yaml.dump(self.settings, f)
 
 
 def run(cmd, quiet=False, write_to=None, fail_ok=False, empty_return=False, timestamp=False, timeout=None, fail_exits=False):
@@ -70,9 +89,16 @@ def download(url, path):
                 f.write(chunk)
 
 
+def install_debs(urls):
+    for url in urls:
+        install_deb(url)
+
+
 def install_deb(url):
     filename = os.path.basename(urlparse(url).path)
     filename = os.path.join('/tmp/boblify/', filename)
+    if not filename.endswith('.deb'):
+        filename += '.deb'
     try:
         os.makedirs('/tmp/boblify/')
     except OSError:

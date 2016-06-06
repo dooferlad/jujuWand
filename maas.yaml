@@ -6,24 +6,52 @@ network:
   ip_range_high: 192.168.1.99
   ip_range_low: 192.168.1.10
   management: 2
+  router_ip: 192.168.1.1
   static_ip_range_high: 192.168.1.250
   static_ip_range_low: 192.168.1.100
   subnet_mask: 255.255.255.0
-  router_ip: 192.168.1.1
 nodes:
-  b8:ae:ed:76:7f:f9:
-    pdu_index: 5
-    hostname: mal
-  b8:ae:ed:76:80:72:
-    pdu_index: 6
+  00:e0:60:00:11:27:
     hostname: wash
-  c0:3f:d5:65:8f:dc:
-    pdu_index: 1
+    pdu_index: 7
+  00:e0:7c:c8:1e:1d:
+    hostname: mal
+    pdu_index: 6
+  00:e0:7c:c8:61:de:
     hostname: kaylee
-  c0:3f:d5:65:9f:1e:
-    pdu_index: 0
+    pdu_index: 2
+  00:e1:00:00:16:90:
     hostname: river
+    pdu_index: 1
+  60:e3:27:00:6a:28:
+    hostname: inara
+    pdu_index: 5
+  60:e3:27:00:ee:ba:
+    hostname: inara
+    pdu_index: 5
+  68:05:ca:40:b7:53:
+    hostname: zoe
+    pdu_index: 8
+  b8:ae:ed:76:7f:f9:
+    hostname: mal
+    pdu_index: 6
+  b8:ae:ed:76:80:72:
+    hostname: wash
+    pdu_index: 7
+  c0:3f:d5:65:8f:dc:
+    hostname: kaylee
+    pdu_index: 2
+  c0:3f:d5:65:9f:1e:
+    hostname: river
+    pdu_index: 1
+  d4:3d:7e:38:76:02:
+    hostname: inara
+    pdu_index: 5
+  f8:32:e4:9b:5c:73:
+    hostname: zoe
+    pdu_index: 8
 password: 12qwaszx
 pdu_path: /home/dooferlad/dev/trivial_pdu
 profile: maas
 username: dooferlad
+ssh_public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfOdURpT4wFg6EQJaFTO9T+6Y4Gg3VLYWliMgFOS8mdIbBkeVGQWQBhF4psI3dLv9ybzNWkiJS3UJF9kt+kz8VfxcuSbm2xtpUgbYqMEDp4l4UT0TAtIijAmSnJV8uvsh83x28R2TdMUt6Kg0RrbRkgiGK3AAYjWferzK4mFk/FqWeK7WEB4Oo6t+QXkRbCA/rVsMleiEG8A4M2gQYcxJmSg0JxDhXtrseNVd4zkYXybY3aPfrdvtp0pEQi21i10kTxCNx9m9W7fd2uBEIpiWSqKaSodP8M6WLc6ZbpYGJO49dyLb29MaYmEBIQIt8R9kQqFuIUxDCYJmLWZiFQKqj dooferlad@MrFancyPants"

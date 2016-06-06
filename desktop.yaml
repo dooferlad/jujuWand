@@ -1,0 +1,39 @@
+ppas:
+ - ppa:no1wantdthisname/ppa
+
+packages:
+ - fontconfig-infinality
+ - htop
+ - byobu
+ - git
+ - meld
+ - lm-sensors
+ - mercurial
+ - bzr
+ - openjdk-8-jre
+ - gparted
+ - pavucontrol
+ - tree
+ - pyflakes
+ - flake8
+ - python-apt
+
+download_debs:
+ - https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+ - https://download.sublimetext.com/sublime-text_build-3112_amd64.deb
+ - http://www.syntevo.com/static/smart/download/smartgit/smartgit-7_1_3.deb
+
+ubuntu_mirror: mirror.sax.uk.as61049.net
+
+apt_proxy: http://192.168.0.2:8000
+
+download_and_run:
+#  https://download.code42.com/installs/linux/install/CrashPlan/CrashPlan_4.7.0_Linux.tgz:
+#   - tar -zxf {filename}
+#   - cd crashplan-install
+#   - sudo ./install.sh
+
+  https://storage.googleapis.com/golang/go1.6.2.linux-amd64.tar.gz:
+   - sudo tar -C /usr/local -xzf {filename}
+
+  # PyCharm -- in home directory copy

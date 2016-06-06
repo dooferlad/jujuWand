@@ -3,23 +3,14 @@ import os
 import tempfile
 
 import shelly
-import yaml
 import json
 import time
+import argparse
+from textwrap import dedent
+import subprocess
 
 
-class Runner:
-    def __init__(self, settings_file_name):
-        with open(settings_file_name) as f:
-            self.settings = yaml.load(f)
-            self.settings_file_name = settings_file_name
-
-    def sudo(self, cmd, fail_ok=False):
-        return shelly.sudo(cmd.format(**self.settings), fail_ok=fail_ok)
-
-    def run(self, cmd, fail_ok=False):
-        return shelly.run(cmd.format(**self.settings), fail_ok=fail_ok)
-
+class Runner(shelly.Runner):
     def maas(self, cmd, quiet=False):
         cmd = 'maas {profile} ' + cmd
 
@@ -28,21 +19,19 @@ class Runner:
         out = ''
         while rc and tries_remaining:
             tries_remaining -= 1
-            out, rc = shelly.run(cmd.format(**self.settings), timeout=5,
-                                 fail_ok=True, quiet=quiet)
+            out, rc = run(cmd.format(**self.settings), timeout=5,
+                          fail_ok=True, quiet=quiet)
             if rc:
                 print('command failed (rc={}), {} attempts remaining'.format(
-                        rc, tries_remaining))
-            time.sleep(5)
+                    rc, tries_remaining))
+                time.sleep(5)
+            else:
+                time.sleep(0.5)
 
         try:
             return json.loads(out)
         except ValueError:
             return []
-
-    def save_settings(self):
-        with open(self.settings_file_name, 'w') as f:
-            yaml.dump(self.settings, f)
 
 
 def setup_maas_server(r, settings):
@@ -64,7 +53,28 @@ def setup_maas_server(r, settings):
                 fail_ok=True)[1]:
         time.sleep(3)
 
-    r.maas('boot-resources import')
+    # Reconfigure maas-proxy, or it won't work (1.8, really).
+    # Reconfigure everything for good measure...
+    pkgs = ['maas',
+            'maas-cluster-controller',
+            'maas-dhcp',
+            'maas-proxy',
+            'maas-region-controller-min',
+            'maas-cli',
+            'maas-common',
+            'maas-dns',
+            'maas-region-controller']
+    for pkg in pkgs:
+        r.sudo('dpkg-reconfigure --frontend noninteractive {}'.format(pkg))
+
+    # r.maas('boot-resources import')
+
+
+def setup_dns_and_keys(r):
+    r.maas("maas set-config name=upstream_dns value='8.8.8.8 8.8.4.4'")
+    keys = r.maas('sshkeys list')
+    if len(keys) == 0:
+        r.maas('sshkeys new key="{ssh_public_key}"')
 
 
 def setup_network(r, settings):
@@ -87,18 +97,39 @@ def setup_network(r, settings):
             r.maas(cmd)
 
 
+# Setting up a mirror seems like a lot more trouble than using a well configured proxy
 def setup_mirror(r):
+    # Keep /var/www in my home directory so when I revert to an earlier
+    # root snapshot I don't need to re-mirror
+    r.sudo('rm -rf /var/www')
+    r.sudo('ln -s /home/www /var/www')
+
+    boot_sources = r.maas('boot-sources read')
+
+    path = 'ephemeral-v2/releases/'
+    url = 'http://{ipaddress}/maas/images/{path}'.format(path=path, **r.settings)
+    found_mirror = False
+
+    for bs in boot_sources:
+        if int(bs['id']) == 1:
+            # Delete the upstream source. At the moment this is too slow to use.
+            r.maas('boot-source delete 1')
+        if bs['url'] == url:
+            found_mirror = True
+
     r.sudo("sstream-mirror"
            " --keyring=/usr/share/keyrings/ubuntu-cloudimage-keyring.gpg"
-           " http://maas.ubuntu.com/images/ephemeral-v2/daily/"
-           " /var/www/html/maas/images/ephemeral-v2/daily"
+           " https://images.maas.io/" + path +
+           " /var/www/html/maas/images/" + path +
            " 'arch=amd64'"
-           " 'subarch~(generic|hwe-t)'"
-           " 'release~(trusty|precise)'"
+           #" 'subarch~(generic|hwe-t|hwe-x)'"
+           " 'release~(trusty|precise|xenial)'"
            " --max=1")
 
-    r.maas('boot-sources create url=http://{ipaddress}/MAAS '
-           'keyring_filename=/usr/share/keyrings/ubuntu-cloudimage-keyring.gpg')
+    if not found_mirror:
+        r.maas('boot-sources create url=http://{ipaddress}/maas/images/' + path +
+               ' keyring_filename=/usr/share/keyrings/ubuntu-cloudimage-keyring.gpg')
+
     r.maas('boot-resources import')
 
     r.maas('maas set-config name=main_archive '
@@ -117,7 +148,7 @@ def set_maas_defaults(r, settings):
         f.write(cfg.format(**settings) + '\n')
     f.close()
 
-    r.sudo('sudo debconf-set-selections ' + f.name)
+    r.sudo('debconf-set-selections ' + f.name)
     os.unlink(f.name)
 
 
@@ -125,6 +156,26 @@ def wait_for_quiet(silence=30):
     # Wait for the maas log to have no new entries for <silence> seconds.
     while time.time() < os.path.getmtime('/var/log/maas/maas.log') + silence:
         time.sleep(1)
+
+
+def wait_for_boot_resources(r):
+    old_len = 0
+    while True:
+        res = r.maas('boot-resources read', quiet=True)
+        print(len(res))
+        if len(res) > 3 and old_len == 0:
+            # Looks like the import has already happened. Just return.
+            return
+
+        if old_len != len(res):
+            old_len = len(res)
+            time.sleep(30)
+            continue
+
+        if len(res) > 1:
+            # Really don't know how many entries will turn up. Giving at least
+            # 30 seconds between changes to this list should be enough.
+            return
 
 
 def setup_maas_nodes(r, settings):
@@ -135,10 +186,19 @@ def setup_maas_nodes(r, settings):
         r.run('{pdu_path}/all_on.py')
 
     # Wait for the nodes to appear
-    while len(nodes) < len(settings['nodes']):
-        print('found {} of {} nodes'.format(len(nodes), len(settings['nodes'])))
+    # Since we index off MAC address, multi-NIC nodes show up more than once...
+    unique_nodes = []
+    for mac, n in settings['nodes'].items():
+        if n['hostname'] not in unique_nodes:
+            unique_nodes.append(n['hostname'])
+
+    old_len = 0
+    while len(nodes) < len(unique_nodes):
+        if len(nodes) > old_len:
+            print('found {} of {} nodes'.format(len(nodes), len(unique_nodes)))
+            old_len = len(nodes)
         time.sleep(5)
-        nodes = r.maas('nodes list')
+        nodes = r.maas('nodes list', quiet=True)
 
     # We know the mac address of a network card in each node. Use that to find
     # per-node settings and set them.
@@ -155,10 +215,13 @@ def setup_maas_nodes(r, settings):
                 'power_parameters_power_pass={n} '
                 'hostname={hostname}'.format(
                     system_id=node['system_id'],
-                    n=node_settings['pdu_index'] + 1,
+                    n=node_settings['pdu_index'],
                     hostname=node_settings['hostname']))
 
     r.run('{pdu_path}/all_off.py')
+    r.sudo('rm /tmp/pdu_state.json')
+    r.sudo('rm /tmp/pdu_lock')
+    r.sudo('rm /tmp/log')
     r.maas('nodes accept-all')
 
 
@@ -178,15 +241,24 @@ def setup_maas_fabrics(r):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--version', default=1.9, type=float)
+    args = parser.parse_args()
+
     runner = Runner('maas.yaml')
     settings = runner.settings
 
     set_maas_defaults(runner, settings)
 
-    ppas = [
-        'ppa:maas/stable',
-    ]
-    shelly.install_ppas(ppas)
+    if args.version > 1.8:
+        ppas = [
+            'ppa:maas/stable',
+        ]
+        try:
+            shelly.install_ppas(ppas)
+        except subprocess.CalledProcessError:
+            print("Couldn't find a MAAS PPA for this distro. Continuing without...")
+
     packages = [
         'maas',
         'wsmancli',
@@ -194,6 +266,12 @@ def main():
         'simplestreams',
         'ubuntu-cloudimage-keyring',
         'apache2',
+
+        # Not strictly needed, but, well, I need them.
+        'bwm-ng',
+        'nethogs',
+        'htop',
+        'byobu',
     ]
     shelly.install_packages(packages)
 
@@ -201,14 +279,29 @@ def main():
         runner.sudo('ln -s {pdu_path}/amttool /usr/local/bin/amttool')
 
     setup_maas_server(runner, settings)
+    setup_dns_and_keys(runner)
     setup_mirror(runner)
     setup_network(runner, settings)
+
+    wait_for_boot_resources(runner)
+    print('waiting for quiet...')
     wait_for_quiet(90)
+    print('lets import some nodes!')
+
     setup_maas_nodes(runner, settings)
 
-    setup_maas_fabrics(runner)
+    if args.version > 1.8:
+        setup_maas_fabrics(runner)
 
     runner.save_settings()
+
+    if args.version <= 1.8:
+        print(dedent("""
+              !!! You *must* set up:\n
+               * The default route in the MAAS network
+               * Upstream DNS
+               * Your SSH key(s)
+              """))
 
 
 if __name__ == '__main__':

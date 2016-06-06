@@ -201,7 +201,10 @@ def bootstrap(controller_name, cloud=None, params=None):
             cmd = 'bootstrap -e {controller} --upload-tools --debug'
         if params:
             for k, v in params.items():
-                cmd += ' --{} "{}"'.format(k, v)
+                if v != '':
+                    cmd += ' --{} "{}"'.format(k, v)
+                else:
+                    cmd += ' --{}'.format(k)
 
         juju(cmd.format(controller=controller_name, cloud=cloud))
 
