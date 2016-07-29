@@ -1,10 +1,9 @@
 #!/usr/bin/python3
 import argparse
 
-import re
+import time
 
-from wand import bootstrap, clean, juju
-from shelly import sudo, run
+from wand import bootstrap, clean, juju, wait
 
 
 def main(controller, series):
@@ -13,23 +12,12 @@ def main(controller, series):
         'bootstrap-series': series
     })
 
-    juju('switch {}:controller'.format(controller))
-    juju('enable-ha')
+    #juju('deploy /home/dooferlad/charms/builds/resource-get-test')
+    juju('deploy /home/dooferlad/charms/builds/resource-get-test --resource '
+         'aresource=/home/dooferlad/a-file.bin')
+    wait()
+    #juju('attach resource-get-test name=/home/dooferlad/a-file.bin')
 
-    return
-
-    juju_bin = run('which juju', quiet=True).rstrip()
-    run('cp {} /tmp'.format(juju_bin), quiet=True)
-    run('cp {}d /tmp'.format(juju_bin), quiet=True)
-
-    out = juju('add-user testuser', quiet=True)
-    for line in out.splitlines():
-        if re.search('juju register', line):
-            cmd = line
-            break
-
-    sudo('/tmp/juju {}'.format(cmd), user='testuser')
-    sudo('/tmp/juju ensure-availability', user='testuser')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

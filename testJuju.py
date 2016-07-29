@@ -35,8 +35,20 @@ def package_list():
     for root, dirs, files in os.walk(JUJU_ROOT):
         for filename in fnmatch.filter(files, pattern):
             p = root[src_len:]
+            dirs = os.path.split(p)
+            skip = False
+            for d in dirs:
+                if d.startswith('.'):
+                    skip = True
+                    break
+            if skip:
+                break
             if p not in packages:
                 packages.append(p)
+
+            # we break, not continue, because at this point we have appended
+            # a package from a directory that contains a _test.go
+            break
 
     return sorted(packages)
 

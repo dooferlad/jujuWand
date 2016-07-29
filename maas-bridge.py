@@ -7,8 +7,8 @@ from wand import bootstrap, clean, juju
 def main(controller):
     clean(controller)
     bootstrap(controller, params={
-        #'to': 'zoe.maas',
-        #'keep-broken': '',
+        'to': 'zoe.maas',
+        'keep-broken': '',
         #'config': 'bootstrap-timeout=2000',
     })
     juju('deploy mysql')

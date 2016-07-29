@@ -77,7 +77,9 @@ def run(cmd, quiet=False, write_to=None, fail_ok=False, empty_return=False, time
     return out
 
 
-def sudo(command, **kwargs):
+def sudo(command, user=None, **kwargs):
+    if user is not None:
+        return run('sudo -iu {} {}'.format(user, command, **kwargs))
     return run('sudo ' + command, **kwargs)
 
 

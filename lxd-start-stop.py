@@ -25,6 +25,7 @@ def main():
             juju('add-machine -m bar lxc:{}'.format(i))
 
     wait()
+    juju('destroy-controller {} --destroy-all-models -y'.format(controller))
     clean(controller)
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ def set_apt_proxy(r):
      Retries "0";
      HTTP { Proxy "{apt_proxy}"; };
     };
-    """)
+    """.format(**r.settings))
 
     with open('31proxy', 'w') as f:
         f.write(proxy)
