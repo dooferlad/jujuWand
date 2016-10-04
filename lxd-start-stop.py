@@ -1,10 +1,11 @@
 #!/usr/bin/python3
+import argparse
 
 from wand import bootstrap, clean, wait, status, juju
 from pprint import pprint
 
 
-def main():
+def main(stop):
     controller = 'lxd'
     clean(controller)
     bootstrap(controller)
@@ -21,12 +22,16 @@ def main():
         juju('add-machine -m foo')
         juju('add-machine -m bar')
         for j in range(containers):
-            juju('add-machine -m foo lxc:{}'.format(i))
-            juju('add-machine -m bar lxc:{}'.format(i))
+            juju('add-machine -m foo lxd:{}'.format(i))
+            juju('add-machine -m bar lxd:{}'.format(i))
 
     wait()
-    juju('destroy-controller {} --destroy-all-models -y'.format(controller))
-    clean(controller)
+    if stop:
+        juju('destroy-controller {} --destroy-all-models -y'.format(controller))
+        clean(controller)
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--stop')
+    args = parser.parse_args()
+    main(args.stop)

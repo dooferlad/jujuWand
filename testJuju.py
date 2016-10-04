@@ -191,12 +191,18 @@ def test(args, db):
         packages = package_list()
         # Start long tests first
         packages = sorted(packages, key=lambda p: long_tests.get(p, 0), reverse=True)
+        packages.remove('state')
+
         rc, failures = test_packages(packages)
+
+        # Always run state last because it just doesn't like the company
+        state_rc, state_failures = test_packages(['state'])
+
         print('Test duration:', datetime.now() - start_time)
-        if rc:
+        if rc or state_rc:
             filename = '/tmp/all_failures.txt'
             with open(filename, 'w') as f:
-                for p in failures:
+                for p in failures + state_failures:
                     logName = os.path.join('/tmp', p, 'out.txt')
                     with open(logName) as i:
                         f.write(i.read())

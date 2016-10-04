@@ -63,7 +63,7 @@ def status():
 
 def kill(controller, force=False):
     if v2():
-        juju("kill-controller -y {}".format(controller))
+        juju("kill-controller -y {} -t 10s".format(controller))
     else:
         cmd = 'destroy-environment {} -y'.format(controller)
         if force:
@@ -196,7 +196,7 @@ def bootstrap(controller_name, cloud=None, params=None):
 
     if not bootstrapped(controller_name):
         if v2():
-            cmd = 'bootstrap {controller} {cloud} --upload-tools --debug'
+            cmd = 'bootstrap {controller} {cloud} --debug --no-gui'
         else:
             cmd = 'bootstrap -e {controller} --upload-tools --debug'
         if params:
